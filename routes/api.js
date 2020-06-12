@@ -2,6 +2,7 @@ const express = require('express');
 const user = require('../models/user.js');
 const token = require('../models/token.js');
 const question = require('../models/question.js');
+const comment = require('../models/comment.js');
 const router = express.Router();
 
 function generateToken(length = 38) {
@@ -117,6 +118,58 @@ router.post('/question/create', async function(req, res, next) {
   else res.json({
     success: false,
     error: 'Сan\'t create a question, not all parameters are specified.'
+  });
+});
+
+router.post('/comment/create', async function(req, res, next) {
+  if (['token', 'target', 'body'].every(key => key in req.body && req.body[key].trim().length > 0)) {
+    const { target, body } = req.body;
+    const matchToken = await token.findOne({ token: req.body.token });
+
+    if (matchToken) {
+      const matchUser = await user.findById(matchToken.owner);
+
+      if (matchUser) {
+        if (/^[0-9a-fA-F]{24}$/.test(target)) {
+          let matchTarget = await question.findById(target);
+          if (!matchTarget) matchTarget = await comment.findById(target);
+
+          if (matchTarget) {
+            const newComment = new comment({ owner: matchUser.id, created: Date.now(), target, body });
+            await newComment.save();
+
+            res.json({
+              success: true
+            });
+          }
+
+          else res.json({
+            success: false,
+            error: 'Сan\'t create a comment, target not found.'
+          });
+        }
+
+        else res.json({
+          success: false,
+          error: 'Сan\'t create a comment, invalid target id.'
+        });
+      }
+
+      else res.json({
+        success: false,
+        error: 'Сan\'t create a comment, user not found.'
+      });
+    }
+
+    else res.json({
+      success: false,
+      error: 'Сan\'t create a comment, wrong token.'
+    });
+  }
+
+  else res.json({
+    success: false,
+    error: 'Сan\'t create a comment, not all parameters are specified.'
   });
 });
 
