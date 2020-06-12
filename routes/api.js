@@ -3,6 +3,7 @@ const user = require('../models/user.js');
 const token = require('../models/token.js');
 const question = require('../models/question.js');
 const comment = require('../models/comment.js');
+const vote = require('../models/vote.js');
 const router = express.Router();
 
 function generateToken(length = 38) {
@@ -170,6 +171,78 @@ router.post('/comment/create', async function(req, res, next) {
   else res.json({
     success: false,
     error: 'Сan\'t create a comment, not all parameters are specified.'
+  });
+});
+
+router.post('/vote/create', async function(req, res, next) {
+  if (['token', 'target', 'good'].every(key => key in req.body)) {
+    const { target, good } = req.body;
+    const matchToken = await token.findOne({ token: req.body.token });
+
+    if (matchToken) {
+      const matchUser = await user.findById(matchToken.owner);
+
+      if (matchUser) {
+        if (/^[0-9a-fA-F]{24}$/.test(target)) {
+          let matchTarget = await question.findById(target);
+          if (!matchTarget) matchTarget = await comment.findById(target);
+
+          if (matchTarget) {
+            const matchVote = await vote.findOne({ target, owner: matchUser.id });
+
+            if (matchVote) {
+              if (matchVote.good != good) {
+                matchVote.good = good;
+                await matchVote.save();
+
+                res.json({
+                  success: true
+                });
+              }
+
+              else res.json({
+                success: false,
+                error: 'Сan\'t create a vote, it\'s already exists.'
+              });
+            }
+
+            else {
+              const newVote = new vote({ owner: matchUser.id, target, good });
+              await newVote.save();
+
+              res.json({
+                success: true
+              });
+            }
+          }
+
+          else res.json({
+            success: false,
+            error: 'Сan\'t create a vote, target not found.'
+          });
+        }
+
+        else res.json({
+          success: false,
+          error: 'Сan\'t create a vote, invalid target id.'
+        });
+      }
+
+      else res.json({
+        success: false,
+        error: 'Сan\'t create a vote, user not found.'
+      });
+    }
+
+    else res.json({
+      success: false,
+      error: 'Сan\'t create a vote, wrong token.'
+    });
+  }
+
+  else res.json({
+    success: false,
+    error: 'Сan\'t create a vote, not all parameters are specified.'
   });
 });
 
