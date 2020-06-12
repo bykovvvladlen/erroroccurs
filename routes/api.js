@@ -1,6 +1,7 @@
 const express = require('express');
 const user = require('../models/user.js');
 const token = require('../models/token.js');
+const question = require('../models/question.js');
 const router = express.Router();
 
 function generateToken(length = 38) {
@@ -81,6 +82,41 @@ router.post('/signin', async function(req, res, next) {
   else res.json({
     success: false,
     error: 'Сan\'t login, not all options are specified.'
+  });
+});
+
+router.post('/question/create', async function(req, res, next) {
+  if (['token', 'title', 'body'].every(key => key in req.body && req.body[key].trim().length > 0)) {
+    const { title, body } = req.body;
+    const matchToken = await token.findOne({ token: req.body.token });
+
+    if (matchToken) {
+      const matchUser = await user.findOne({ _id: matchToken.owner });
+
+      if (matchUser) {
+        const newQuestion = new question({ owner: matchUser.id, created: Date.now(), title, body });
+        await newQuestion.save();
+
+        res.json({
+          success: true
+        });
+      }
+
+      else res.json({
+        success: false,
+        error: 'Сan\'t create a question, user not found.'
+      });
+    }
+
+    else res.json({
+      success: false,
+      error: 'Сan\'t create a question, wrong token.'
+    });
+  }
+
+  else res.json({
+    success: false,
+    error: 'Сan\'t create a question, not all parameters are specified.'
   });
 });
 
